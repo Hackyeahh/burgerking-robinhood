@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Callable, Literal
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -9,17 +9,15 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support.ui import Select
 import time
 import re
+import logging
+import warnings
 
 from loguru import logger
 from tqdm import tqdm
 
-
-import logging
-
 logging.getLogger("selenium").setLevel(logging.CRITICAL)
 logging.getLogger("urllib3").setLevel(logging.CRITICAL)
 
-import warnings
 
 warnings.filterwarnings("ignore")
 
@@ -33,7 +31,6 @@ logger.add(
     colorize=True,
     format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <level>{message}</level>",
 )
-
 
 
 logger.info("🔧 Installing Chrome WebDriver")
@@ -50,6 +47,7 @@ options.add_argument("--silent")
 options.add_argument("--disable-logging")
 options.add_argument("--disable-dev-shm-usage")
 options.add_argument("--no-first-run")
+
 
 logger.info("🌐 Launching headless Chrome browser")
 driver = webdriver.Chrome(service=service, options=options)
@@ -370,28 +368,28 @@ def clean_up_webdriver():
 
 
 # MAIN EXECUTION
-recipe = [
-    stage_00_store_info(),
-    stage_01_visit_details(),
-    stage_02_satisfaction_rating(),
-    stage_03_satisfaction_feedback(),
-    stage_04_order_type(),
-    stage_05_order_location(),
-    stage_06_royal_perks(),
-    stage_07_customer_rituals(),
-    stage_08_category_satisfaction(),
-    stage_09_return_recommend(),
-    stage_10_problems(),
-    stage_11_order_items(),
-    stage_11a_beef_items(),
-    stage_11b_side_items(),
-    stage_11c_drink_items(),
-    stage_12_whopper_satisfaction(),
-    stage_13_whopper_categories(),
-    stages_14_to_23(),
-    extract_validation_code(),
-    clean_up_webdriver(),
+recipe: list[Callable] = [
+    stage_00_store_info,
+    stage_01_visit_details,
+    stage_02_satisfaction_rating,
+    stage_03_satisfaction_feedback,
+    stage_04_order_type,
+    stage_05_order_location,
+    stage_06_royal_perks,
+    stage_07_customer_rituals,
+    stage_08_category_satisfaction,
+    stage_09_return_recommend,
+    stage_10_problems,
+    stage_11_order_items,
+    stage_11a_beef_items,
+    stage_11b_side_items,
+    stage_11c_drink_items,
+    stage_12_whopper_satisfaction,
+    stage_13_whopper_categories,
+    stages_14_to_23,
+    extract_validation_code,
+    clean_up_webdriver,
 ]
 
 for step in recipe:
-    
+    step()
