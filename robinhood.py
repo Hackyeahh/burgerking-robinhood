@@ -80,6 +80,9 @@ progress_bar = tqdm(
     leave=True,
 )
 
+setup_time = time.time() - start_time
+logger.info(f"⏱️ Total execution time: {setup_time:.1f} seconds")
+
 
 # @lru_cache(maxsize=100)
 def get_id(element_id: str):
