@@ -1,4 +1,5 @@
 *.ipynb
+.wdm
 
 # Python-generated files
 __pycache__/

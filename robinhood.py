@@ -1,5 +1,12 @@
+import contextlib
+import sys
+from tqdm import tqdm
+from tqdm.contrib import DummyTqdmFile
 from typing import Callable, Literal
 from webdriver_manager.chrome import ChromeDriverManager
+from webdriver_manager.core.driver_cache import DriverCacheManager
+from webdriver_manager.core.file_manager import FileManager
+from webdriver_manager.core.os_manager import OperationSystemManager
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from datetime import datetime, timedelta
@@ -24,6 +31,21 @@ warnings.filterwarnings("ignore")
 start_time = time.time()
 logger.info("🚀 Starting Burger King Survey Automation")
 
+
+@contextlib.contextmanager
+def std_out_err_redirect_tqdm():
+    orig_out_err = sys.stdout, sys.stderr
+    try:
+        sys.stdout, sys.stderr = map(DummyTqdmFile, orig_out_err)
+        yield orig_out_err[0]
+    # Relay exceptions
+    except Exception as exc:
+        raise exc
+    # Always restore sys.stdout/err if necessary
+    finally:
+        sys.stdout, sys.stderr = orig_out_err
+
+
 # Simple approach: just configure loguru to work with tqdm
 logger.remove()
 logger.add(
@@ -33,24 +55,31 @@ logger.add(
 )
 
 
-logger.info("🔧 Installing Chrome WebDriver")
-service = Service(ChromeDriverManager().install())
+def setup_webdriver() -> webdriver.Chrome:
+    logger.info("🔧 Installing Chrome WebDriver")
 
-options = webdriver.ChromeOptions()
-options.add_argument("--headless=new")
-options.add_argument("--disable-gpu")
-options.add_argument("--no-sandbox")
-options.add_argument("--window-size=1920,1080")
+    cache_manager = DriverCacheManager(root_dir=".", valid_range=1)
+    service = Service(ChromeDriverManager(cache_manager=cache_manager).install())
+    download_time = time.time() - start_time
+    logger.info(f"⏱️ Webdriver loaded in: {download_time:.1f} seconds")
 
-options.add_argument("--log-level=3")
-options.add_argument("--silent")
-options.add_argument("--disable-logging")
-options.add_argument("--disable-dev-shm-usage")
-options.add_argument("--no-first-run")
+    options = webdriver.ChromeOptions()
+    options.add_argument("--headless=new")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--window-size=1920,1080")
+
+    options.add_argument("--log-level=3")
+    options.add_argument("--silent")
+    options.add_argument("--disable-logging")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--no-first-run")
+
+    logger.info("🌐 Launching headless Chrome browser")
+    return webdriver.Chrome(service=service, options=options)
 
 
-logger.info("🌐 Launching headless Chrome browser")
-driver = webdriver.Chrome(service=service, options=options)
+driver = setup_webdriver()
 
 PLATFORM: Literal["desktop"] | Literal["mobile"] = "desktop"
 BK_URL = r"https://www.mybkexperience.com/"
@@ -78,11 +107,11 @@ progress_bar = tqdm(
     leave=True,
 )
 
+
 setup_time = time.time() - start_time
 logger.info(f"⏱️ Total execution time: {setup_time:.1f} seconds")
 
 
-# @lru_cache(maxsize=100)
 def get_id(element_id: str):
     return wait.until(EC.element_to_be_clickable((By.ID, element_id)))
 
@@ -132,7 +161,20 @@ def stage_02_satisfaction_rating():
 def stage_03_satisfaction_feedback():
     logger.info("📝 Stage 03: Entering satisfaction feedback")
 
-    OVERALL_SATISFACTION_RESPONSE = "everything was good, no issues with the order! service was fast & efficient like usual. restaurant was clean and experience met expectations"
+    responses = [
+        "everything was good, no issues with the order! service was fast & efficient like usual. restaurant was clean and experiencemet expectations",
+        "had a great experience today! staff was friendly and helpful. food came out hot and fresh as expected",
+        "quick service and accurate order! restaurant appeared clean and well-maintained. overall satisfied with the visit",
+        "smooth transaction from start to finish! employees were courteous and the food quality was consistent with previous visits",
+        "no complaints at all! order was prepared correctly and delivered promptly. dining area was tidy and comfortable",
+        "positive experience overall! staff worked efficiently and the food met my expectations. would definitely return",
+        "everything went smoothly during my visit! service was professional and the restaurant maintained good cleanliness standards",
+        "satisfied customer here! order accuracy was perfect and staff demonstrated good customer service skills throughout",
+        "great job by the team today! food quality was solid and the service timeline was reasonable for the lunch rush",
+        "nothing to complain about! restaurant operations seemed well-organized and the final product met expectations as usual",
+    ]
+
+    OVERALL_SATISFACTION_RESPONSE = responses[-1]
     logger.debug(f"Feedback text: {OVERALL_SATISFACTION_RESPONSE[:50]}...")
 
     get_id("QR~QID120").send_keys(OVERALL_SATISFACTION_RESPONSE)
