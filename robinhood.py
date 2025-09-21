@@ -1,12 +1,11 @@
 import contextlib
+import random
 import sys
 from tqdm import tqdm
 from tqdm.contrib import DummyTqdmFile
 from typing import Callable, Literal
 from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.core.driver_cache import DriverCacheManager
-from webdriver_manager.core.file_manager import FileManager
-from webdriver_manager.core.os_manager import OperationSystemManager
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from datetime import datetime, timedelta
@@ -21,6 +20,12 @@ import warnings
 
 from loguru import logger
 from tqdm import tqdm
+from selenium.common.exceptions import TimeoutException
+
+
+PLATFORM: Literal["desktop"] | Literal["mobile"] = "desktop"
+BK_URL = r"https://www.mybkexperience.com/"
+
 
 logging.getLogger("selenium").setLevel(logging.CRITICAL)
 logging.getLogger("urllib3").setLevel(logging.CRITICAL)
@@ -79,37 +84,9 @@ def setup_webdriver() -> webdriver.Chrome:
     return webdriver.Chrome(service=service, options=options)
 
 
-driver = setup_webdriver()
-
-PLATFORM: Literal["desktop"] | Literal["mobile"] = "desktop"
-BK_URL = r"https://www.mybkexperience.com/"
-
-logger.info(f"📍 Navigating to Burger King survey: {BK_URL}")
-driver.get(BK_URL)
-driver.maximize_window()
-
-
-TIMEOUT_SECONDS = 10
-wait = WebDriverWait(driver, TIMEOUT_SECONDS)
-
-
-logger.info("🇫️ Switching to survey iframe")
-form_iframe = driver.find_element(By.CLASS_NAME, r"Home_iframe__T3nfU")
-driver.switch_to.frame(form_iframe)
-
-total_stages = 23
-progress_bar = tqdm(
-    total=total_stages,
-    desc="🍔 Survey Progress",
-    unit="stage",
-    colour="green",
-    position=0,
-    leave=True,
-)
-
-
-setup_time = time.time() - start_time
-logger.info(f"⏱️ Total execution time: {setup_time:.1f} seconds")
+def switch_to_form_iframe():
+    form_iframe = driver.find_element(By.CLASS_NAME, r"Home_iframe__T3nfU")
+    driver.switch_to.frame(form_iframe)
 
 
 def get_id(element_id: str):
@@ -135,7 +112,15 @@ def stage_01_visit_details():
     ONTARIO_OPTION = "46"
     Select(get_id("QR~QID6")).select_by_value(ONTARIO_OPTION)
 
-    VISIT_DATETIME = datetime.now() - timedelta(minutes=5)
+    # STORE_OPEN = timedelta(hours=10, minutes=30)
+    # STORE_CLOSE = timedelta(hours=22, minutes=30)
+
+    now = datetime.now()
+
+    VISIT_DATETIME = datetime(
+        year=now.year, month=now.month, day=now.day, hour=10, minute=30
+    ) + timedelta(days=-1, seconds=random.randint(0, 12 * 60 * 60))
+    logger.debug(VISIT_DATETIME)
     logger.debug(
         f"Visit datetime set to: {VISIT_DATETIME.strftime('%m/%d/%Y %I:%M %p')}"
     )
@@ -172,10 +157,21 @@ def stage_03_satisfaction_feedback():
         "satisfied customer here! order accuracy was perfect and staff demonstrated good customer service skills throughout",
         "great job by the team today! food quality was solid and the service timeline was reasonable for the lunch rush",
         "nothing to complain about! restaurant operations seemed well-organized and the final product met expectations as usual",
+        "everything was good, no issues with the order! service was fast & efficient like usual. restaurant was clean and experiencemet expectations",
+        "had a great experience today! staff was friendly and helpful. food came out hot and fresh as expected",
+        "quick service and accurate order! restaurant appeared clean and well-maintained. overall satisfied with the visit",
+        "smooth transaction from start to finish! employees were courteous and the food quality was consistent with previous visits",
+        "no complaints at all! order was prepared correctly and delivered promptly. dining area was tidy and comfortable",
+        "positive experience overall! staff worked efficiently and the food met my expectations. would definitely return",
+        "everything went smoothly during my visit! service was professional and the restaurant maintained good cleanliness standards",
+        "satisfied customer here! order accuracy was perfect and staff demonstrated good customer service skills throughout",
+        "great job by the team today! food quality was solid and the service timeline was reasonable for the lunch rush",
+        "nothing to complain about! restaurant operations seemed well-organized and the final product met expectations as usual",
     ]
 
-    OVERALL_SATISFACTION_RESPONSE = responses[-1]
-    logger.debug(f"Feedback text: {OVERALL_SATISFACTION_RESPONSE[:50]}...")
+    # OVERALL_SATISFACTION_RESPONSE = responses[0]
+    OVERALL_SATISFACTION_RESPONSE = random.choice(responses)
+    logger.debug(f"Feedback text: {OVERALL_SATISFACTION_RESPONSE}...")
 
     get_id("QR~QID120").send_keys(OVERALL_SATISFACTION_RESPONSE)
     get_id("NextButton").click()
@@ -327,7 +323,7 @@ def stage_13_whopper_categories():
     progress_bar.update(1)
 
 
-def stages_14_to_23():
+def stages_14_to_22():
     logger.info("🔁 Stage 14: Whopper repurchase likelihood")
     get_id("QID50-1-label").click()
     get_id("NextButton").click()
@@ -373,6 +369,8 @@ def stages_14_to_23():
     get_id("NextButton").click()
     progress_bar.update(1)
 
+
+def stage_23_final_stage():
     logger.info("🎁 Stage 23: Promotional opportunities question")
     get_id("QID100-2-label").click()
     get_id("NextButton").click()
@@ -409,6 +407,48 @@ def clean_up_webdriver():
     logger.success("✅ Browser closed successfully")
 
 
+def view_form_cookie():
+    time.sleep(5)
+    driver.refresh()
+    time.sleep(5)
+
+    cookie = driver.get_cookie("ak_bmsc")
+
+    logger.debug((cookie, driver.get_cookies()))
+
+
+# execution starts here
+driver = setup_webdriver()
+
+
+logger.info(f"📍 Navigating to Burger King survey: {BK_URL}")
+driver.get(BK_URL)
+driver.maximize_window()
+
+
+TIMEOUT_SECONDS = 10
+wait = WebDriverWait(driver, TIMEOUT_SECONDS)
+
+
+logger.info("🇫️ Switching to survey iframe")
+switch_to_form_iframe()
+
+
+total_stages = 23
+progress_bar = tqdm(
+    total=total_stages,
+    desc="🍔 Survey Progress",
+    unit="stage",
+    colour="green",
+    position=0,
+    leave=True,
+)
+
+
+setup_time = time.time() - start_time
+logger.info(f"⏱️ Total execution time: {setup_time:.1f} seconds")
+
+
 # MAIN EXECUTION
 recipe: list[Callable] = [
     stage_00_store_info,
@@ -428,10 +468,39 @@ recipe: list[Callable] = [
     stage_11c_drink_items,
     stage_12_whopper_satisfaction,
     stage_13_whopper_categories,
-    stages_14_to_23,
+    stages_14_to_22,
+    stage_23_final_stage,
     extract_validation_code,
     clean_up_webdriver,
 ]
 
-for step in recipe:
-    step()
+cookie_rnd = [
+    stage_00_store_info,
+    stage_01_visit_details,
+    stage_02_satisfaction_rating,
+    stage_03_satisfaction_feedback,
+    stage_04_order_type,
+    stage_05_order_location,
+    stage_06_royal_perks,
+    stage_07_customer_rituals,
+    stage_08_category_satisfaction,
+    stage_09_return_recommend,
+    stage_10_problems,
+    stage_11_order_items,
+    stage_11a_beef_items,
+    stage_11b_side_items,
+    stage_11c_drink_items,
+    stage_12_whopper_satisfaction,
+    stage_13_whopper_categories,
+    stages_14_to_22,
+]
+
+plan_to_execute = recipe
+
+
+try:
+    for i, step in enumerate(plan_to_execute):
+        step()
+except TimeoutException:
+    logger.error("timed out, reverting to manual control...")
+    input()
